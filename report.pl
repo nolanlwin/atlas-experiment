@@ -17,7 +17,16 @@
 # the Free Software Foundation, Inc., 59 Temple Place, Suite 330,
 # Boston, MA 02111-1307 USA
 
-my $opt = shift;
+my $keep_report_log = 0;
+my $opt = "";
+while (defined(my $arg = shift)) {
+	if ($arg eq "--keep-report-log") {
+		$keep_report_log = 1;
+	} else {
+		$opt = $arg;
+		last;
+	}
+}
 
 my $compile;
 my $compile_module;
@@ -42,6 +51,15 @@ my $total_deleted = 0;
 my $total_inspect = 0;
 my $total_ok = 0;
 my $ret = 0;
+
+# Override compiler commands to use GnuCOBOL (cobc) instead of 'cobj'.
+if ($opt) {
+    $compile = "cobc -x -std=cobol85 $opt";
+    $compile_module = "cobc -x -std=cobol85 $opt";
+} else {
+    $compile = "cobc -x -std=cobol85 ";
+    $compile_module = "cobc -x -std=cobol85 ";
+}
 
 $ENV{"COB_SWITCH_1"} = "ON";
 $ENV{"COB_SWITCH_2"} = "OFF";
@@ -138,7 +156,11 @@ foreach $in (sort (glob("*.{,CBL,SUB}"))) {
 		}
       }
       $exec_result = 0;
-      $exec_result = system ("$cmd > $exe.out");
+      if (-e "./$exe.DAT") {
+        $exec_result = system ("./$exe < $exe.DAT > $exe.out");
+      } else {
+        $exec_result = system ("./$exe > $exe.out");
+      }
       if ($exec_result != 0) {
 		$execute_error++;
 		print LOG "  ***** execute error *****\n";
@@ -174,7 +196,11 @@ foreach $in (sort (glob("*.{,CBL,SUB}"))) {
 		$total_deleted += $deleted;
 		$total_inspect += $inspect;
 		$total_ok++ if $fail == 0;
-		rename ("report.log", "$exe.log");
+		if ($keep_report_log) {
+			system ("$copy_cmd report.log $exe.log");
+		} else {
+			rename ("report.log", "$exe.log");
+		}
 		unlink "$exe.out" if (-s "$exe.out" == 0);
       }
     }
